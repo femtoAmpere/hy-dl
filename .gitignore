@@ -2,6 +2,8 @@
 config.py
 .downloads
 downloads/
+downloaders/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
