@@ -1,5 +1,6 @@
 # user
 config.py
+.gallery-dl.conf
 .downloads
 downloads/
 downloaders/

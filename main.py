@@ -14,7 +14,7 @@ def download_gallery_dl(url: str, update_downloader=False) -> str:
         cmd = ''
         if update_downloader:
             cmd += subprocess.check_output(['downloaders/gallery-dl/bin/python', '-m', 'pip', 'install', '--upgrade', 'pip', 'gallery-dl'], shell=False, text=True, stderr=subprocess.STDOUT)
-        cmd += subprocess.check_output(['downloaders/gallery-dl/bin/gallery-dl', '--dest', f'{config.downloads}/gallery-dl', url], shell=False, text=True, stderr=subprocess.STDOUT)
+        cmd += subprocess.check_output(['downloaders/gallery-dl/bin/gallery-dl', '--config', '.gallery-dl.conf', '--dest', f'{config.downloads}/gallery-dl', url], shell=False, text=True, stderr=subprocess.STDOUT)
         return f'+**gallery-dl**\n```\n{cmd}\n```\n'
     except subprocess.CalledProcessError as e:
         return f'-**gallery-dl** error {e.returncode}:\n```\n{e.output}\n```\n'
