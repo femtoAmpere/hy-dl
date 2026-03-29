@@ -1,7 +1,4 @@
 
-import cmd
-from turtle import update
-
 import config
 import os
 
