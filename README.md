@@ -19,3 +19,8 @@ curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o down
 chmod +x downloaders/yt-dlp
 python3 -m venv downloaders/gallery-dl
 ```
+
+## crontab
+```bash
+cd /home/femto/src/hy-dl
+```

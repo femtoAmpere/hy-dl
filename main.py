@@ -2,11 +2,14 @@
 import config
 import os
 
-from datetime import datetime
+import datetime
 from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 import subprocess
+
+
+last_downloaders_update = datetime.datetime.min
 
 
 def download_gallery_dl(url: str, update_downloader=False) -> str:
@@ -60,10 +63,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f.write(url + '\n')
     msg += f'+hydrus-import.txt: `{url}`\n\n'
     
-    hour, update_pending = datetime.now().hour, False
-    if (hour - config.last_updated_hour) > 1: 
+    now, update_pending = datetime.datetime.now(), False
+    global last_downloaders_update
+    if (now - last_downloaders_update).total_seconds() > 60*60*2:
         update_pending = True
-        config.last_updated_hour = hour
+        last_downloaders_update = now
     
     any_downloader_success = False
 
@@ -82,9 +86,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(msg, parse_mode='Markdown')
 
+async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(f'Version: {config.version}\nStartup: {config.startup}\nUptime: {datetime.datetime.now() - config.startup}\nLast Downloaders Update: {last_downloaders_update}')
+
 
 app = ApplicationBuilder().token(config.telegram_token).build()
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+app.add_handler(CommandHandler("info", info))
 
 app.run_polling()
