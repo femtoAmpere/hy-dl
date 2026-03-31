@@ -65,12 +65,13 @@ async def download(urls: str, update_downloader=False) -> str:
     if ret != 0:
         return mounted
 
-    msg = ''
+    telegrams = []
 
     for url in urls:
         url = url.strip()
 
-        msg += f'--------\nDownload Receipt for `{url}`\n\n'
+        msg = ''
+        msg += f'Download Receipt for `{url}`\n\n'
 
         if not url.lower().startswith(('http://', 'https://')):
             msg += 'Please send a valid URL starting with http:// or https://\n'
@@ -100,8 +101,10 @@ async def download(urls: str, update_downloader=False) -> str:
             with open(os.path.join(config.downloads, 'failed.txt'), 'a+') as f:
                 f.write(url + '\n')
             msg += f'+failed.txt: `{url}`\n\n'
+
+        telegrams.append(msg)
         
-    return msg
+    return telegrams
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message.from_user.id not in config.telegram_users:
@@ -117,8 +120,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     urls = update.message.text.strip().split('\n')
     await update.message.reply_text(f'Downloading {len(urls)} URLs...', parse_mode='Markdown')
 
-    msg = await download(update.message.text, update_downloader=update_pending)
-    await update.message.reply_text(msg, parse_mode='Markdown')
+    telegrams = await download(urls, update_downloader=update_pending)
+    for msg in telegrams:
+        await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Version: {config.version}\nStartup: {config.startup}\nUptime: {datetime.datetime.now() - config.startup}\nLast Downloaders Update: {last_downloaders_update}')
