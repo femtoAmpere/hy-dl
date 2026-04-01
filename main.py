@@ -127,6 +127,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Version: {config.version}\nStartup: {config.startup}\nUptime: {datetime.datetime.now() - config.startup}\nLast Downloaders Update: {last_downloaders_update}')
 
+print(f'Starting hy-dl version {config.version} at {config.startup}.')
 
 app = ApplicationBuilder().token(config.telegram_token).build()
 

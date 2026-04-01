@@ -20,7 +20,7 @@ chmod +x downloaders/yt-dlp
 python3 -m venv downloaders/gallery-dl
 ```
 
-## crontab
+## crontab -e
 ```bash
-cd /home/femto/src/hy-dl
+@reboot cd /home/femto/src/hy-dl && sleep 32 && screen -S hy-dl -dm bash -c 'while true; do sleep 8; .venv/bin/python main.py; done'
 ```
