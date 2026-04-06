@@ -75,12 +75,14 @@ async def download(urls: str, update, update_downloader=False) -> str:
 
         if not url.lower().startswith(('http://', 'https://')):
             receipt += 'Please send a valid URL starting with http:// or https://\n'
+            msgs.append(receipt)
             continue
         
         if 'furaffinity.net' in url.lower():
             with open(os.path.join(config.downloads, 'FurAffinity.txt'), 'a+') as f:
                 f.write(url + '\n')
             receipt += f'+FurAffinity.txt'
+            msgs.append(receipt)
             continue
 
         with open(os.path.join(config.downloads, 'hydrus-import.txt'), 'a+') as f:
