@@ -58,6 +58,22 @@ def sh_download_yt_dlp(url: str, update_downloader=False) -> str:
     except Exception as e:
         return e.returncode, f'-**yt-dlp** error {e}\n', e.output
 
+def sh_download_megadl(url: str, update_downloader=False) -> str:
+    
+    os.makedirs(os.path.join(config.downloads, 'megadl'), exist_ok=True)
+
+    try:
+        cmd = ''
+        if update_downloader:
+        #     cmd += subprocess.check_output(['downloaders/megadl', '--update-to', 'nightly'], shell=False, text=True, stderr=subprocess.STDOUT)
+            cmd += "No update possible for megadl.\n"
+        cmd += subprocess.check_output(['megadl', url], shell=False, text=True, cwd=os.path.join(config.downloads, 'megadl'), stderr=subprocess.STDOUT)
+        return 0, f'+**megadl**\n', cmd
+    except subprocess.CalledProcessError as e:
+        return e.returncode, f'-**megadl** error {e.returncode}\n', e.output
+    except Exception as e:
+        return e.returncode, f'-**megadl** error {e}\n', e.output
+
 async def download(urls: str, update, update_downloader=False) -> str:
 
     ret, mounted, _ = sh_mount()
@@ -88,6 +104,17 @@ async def download(urls: str, update, update_downloader=False) -> str:
         with open(os.path.join(config.downloads, 'hydrus-import.txt'), 'a+') as f:
             f.write(url + '\n')
         receipt += f'+hydrus-import.txt\n\n'
+
+        if url.lower().startswith(('https://mega.nz/', 'mega.nz', 'www.mega.nz', 'https://www.mega.nz/')):
+            ret, msg, rio = sh_download_megadl(url, update_downloader=update_downloader)
+            receipt += msg
+            if len(rio) > 0:
+                with io.StringIO(rio) as document:
+                    document.name = 'megadl.txt'
+                    await update.message.reply_document(document=document, caption='megadl receipt')
+            if ret == 0:
+                msgs.append(receipt)
+                continue
 
         any_downloader_success = False
 
