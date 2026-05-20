@@ -24,3 +24,10 @@ python3 -m venv downloaders/gallery-dl
 ```bash
 @reboot cd /home/femto/src/hy-dl && sleep 32 && screen -S hy-dl -dm bash -c 'while true; do sleep 8; .venv/bin/python main.py; done'
 ```
+
+# site-specific tasks
+## deviantart
+You need to run this every three months to refresh the token:
+```bash
+ssh -L 6414:127.0.0.1:6414 host.local 'cd src/hy-dl && ./downloaders/gallery-dl/bin/gallery-dl --config .gallery-dl.conf oauth:deviantart'
+```
