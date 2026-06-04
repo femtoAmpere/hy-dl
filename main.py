@@ -3,7 +3,7 @@ import config
 import os
 import io
 import datetime
-import subprocess
+import asyncio
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -11,70 +11,73 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 
 last_downloaders_update = datetime.datetime.min
 
-
 async def sh_mount(fspath=config.downloads):
     cmd = ''
 
-    try:
-        cmd += subprocess.check_output(['umount', fspath], shell=False, text=True, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        print(f'*WARNING* Failed to unmount target with {e.returncode}. Output: {e.output}')
-    except Exception as e:
-        return e.returncode, f'*ERROR* Failed to unmount target with {e.returncode}', e.output
+    proc = await asyncio.create_subprocess_shell(f'umount {fspath}', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+    cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+    if proc.returncode != 0:
+        print(f'*WARNING* Failed to unmount target with {proc.returncode}. Output: {stderr}')
+        #return proc.returncode, stderr
     
-    try:
-        cmd += subprocess.check_output(['mount', fspath], shell=False, text=True, stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as e:
-        return e.returncode, f'*WARNING* Failed to mount target with {e.returncode}', e.output
-    except Exception as e:
-        return e.returncode, f'*ERROR* Failed to mount target with {e.returncode}', e.output
-
+    proc = await asyncio.create_subprocess_shell(f'mount {fspath}', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+    cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+    if proc.returncode != 0:
+        print(f'*ERROR* Failed to mount target with {proc.returncode}. Output: {stderr}')
+        return proc.returncode, stderr
+        
     return 0, cmd, ''
 
 async def sh_download_gallery_dl(url: str, update_downloader=False) -> str:
-    try:
-        cmd = ''
-        if update_downloader:
-            cmd += subprocess.check_output(['downloaders/gallery-dl/bin/python', '-m', 'pip', 'install', '--upgrade', 'pip', 'gallery-dl'], shell=False, text=True, stderr=subprocess.STDOUT)
-        cmd += subprocess.check_output(['downloaders/gallery-dl/bin/gallery-dl', '--config', '.gallery-dl.conf', '--dest', f'{config.downloads}/gallery-dl', url], shell=False, text=True, stderr=subprocess.STDOUT)
-        return 0, f'+**gallery-dl**\n', cmd
-    except subprocess.CalledProcessError as e:
-        return e.returncode, f'-**gallery-dl** error {e.returncode}\n', e.output
-    except Exception as e:
-        return e.returncode, f'-**gallery-dl** error {e}\n', e.output
+    cmd = ''
+    if update_downloader:
+        proc = await asyncio.create_subprocess_shell(f'downloaders/gallery-dl/bin/python -m pip install --upgrade pip gallery-dl', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, stderr = await proc.communicate()
+        cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+    
+    proc = await asyncio.create_subprocess_shell(f'downloaders/gallery-dl/bin/gallery-dl --config .gallery-dl.conf --dest {config.downloads}/gallery-dl {url}', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+    cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+
+    return proc.returncode, f'+**gallery-dl**\n', cmd
 
 async def sh_download_yt_dlp(url: str, update_downloader=False) -> str:
     os.makedirs(os.path.join(config.downloads, 'yt-dlp'), exist_ok=True)
-    try:
-        cmd = ''
-        if update_downloader:
-            cmd += subprocess.check_output(['downloaders/yt-dlp', '--update-to', 'nightly'], shell=False, text=True, stderr=subprocess.STDOUT)
-        cmd += subprocess.check_output(['../../downloaders/yt-dlp', url], shell=False, text=True, cwd=os.path.join(config.downloads, 'yt-dlp'), stderr=subprocess.STDOUT)
-        return 0, f'+**yt-dlp**\n', cmd
-    except subprocess.CalledProcessError as e:
-        return e.returncode, f'-**yt-dlp** error {e.returncode}\n', e.output
-    except Exception as e:
-        return e.returncode, f'-**yt-dlp** error {e}\n', e.output
+
+    cmd = ''
+    if update_downloader:
+        proc = await asyncio.create_subprocess_shell(f'downloaders/yt-dlp --update-to nightly', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        stdout, stderr = await proc.communicate()
+        cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+    
+    proc = await asyncio.create_subprocess_shell(f'../../downloaders/yt-dlp {url}', cwd=os.path.join(config.downloads, 'yt-dlp'))
+    stdout, stderr = await proc.communicate()
+    cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+
+    return proc.returncode, f'+**yt-dlp**\n', cmd
 
 async def sh_download_megadl(url: str, update_downloader=False) -> str:
     os.makedirs(os.path.join(config.downloads, 'megadl'), exist_ok=True)
-    try:
-        cmd = ''
-        if update_downloader:
-        #     cmd += subprocess.check_output(['downloaders/megadl', '--update-to', 'nightly'], shell=False, text=True, stderr=subprocess.STDOUT)
-            cmd += "No update possible for megadl.\n"
-        cmd += subprocess.check_output(f'megadl {url}', shell=True, text=True, cwd=os.path.join(config.downloads, 'megadl'), stderr=subprocess.STDOUT)
-        return 0, f'+**megadl**\n', cmd
-    except subprocess.CalledProcessError as e:
-        return e.returncode, f'-**megadl** error {e.returncode}\n', e.output
-    except Exception as e:
-        return e.returncode, f'-**megadl** error {e}\n', e.output
+    cmd = ''
+    if update_downloader:
+    #     cmd += await a_check_output(['downloaders/megadl', '--update-to', 'nightly'], shell=False, text=True, stderr=subprocess.STDOUT)
+        cmd += "No update possible for megadl.\n"
+    proc = await asyncio.create_subprocess_shell(f'megadl {url}', cwd=os.path.join(config.downloads, 'megadl'), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    stdout, stderr = await proc.communicate()
+    cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
+    
+    return proc.returncode, f'+**megadl**\n', cmd
 
 async def e6w_bot_url_extract(update: Update, fallback: str = "") -> str:
     msg = update.message
     entities = getattr(msg, "caption_entities") or getattr(msg, "entities") or []
+    for entity in entities:
+        if entity.url and 'e621.net/posts/' in entity.url.lower():
+            return entity.url
     
-    return entities[2].url
+    return fallback
 
 async def download(urls: str, update, update_downloader=False) -> str:
 
@@ -110,7 +113,7 @@ async def download(urls: str, update, update_downloader=False) -> str:
         if url.lower().startswith(('https://mega.nz/', 'mega.nz', 'www.mega.nz', 'https://www.mega.nz/')):
             ret, msg, rio = await sh_download_megadl(url, update_downloader=update_downloader)
             receipt += msg
-            if len(rio) > 0:
+            if rio and len(rio) > 0:
                 with io.StringIO(rio) as document:
                     document.name = 'megadl.txt'
                     await update.message.reply_document(document=document, caption='megadl receipt')
@@ -123,7 +126,7 @@ async def download(urls: str, update, update_downloader=False) -> str:
         ret, msg, rio = await sh_download_gallery_dl(url, update_downloader=update_downloader)
         if ret == 0: any_downloader_success = True
         receipt += msg
-        if len(rio) > 0:
+        if rio and len(rio) > 0:
             with io.StringIO(rio) as document:
                 document.name = 'gallery-dl.txt'
                 await update.message.reply_document(document=document, caption='gallery-dl receipt')
@@ -131,7 +134,7 @@ async def download(urls: str, update, update_downloader=False) -> str:
         ret, msg, rio = await sh_download_yt_dlp(url, update_downloader=update_downloader)
         if ret == 0: any_downloader_success = True
         receipt += msg
-        if len(rio) > 0:
+        if rio and len(rio) > 0:
             with io.StringIO(rio) as document:
                 document.name = 'yt-dlp.txt'
                 await update.message.reply_document(document=document, caption='yt-dlp receipt')
