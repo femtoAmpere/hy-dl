@@ -12,7 +12,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 last_downloaders_update = datetime.datetime.min
 
 
-def sh_mount(fspath=config.downloads):
+async def sh_mount(fspath=config.downloads):
     cmd = ''
 
     try:
@@ -31,7 +31,7 @@ def sh_mount(fspath=config.downloads):
 
     return 0, cmd, ''
 
-def sh_download_gallery_dl(url: str, update_downloader=False) -> str:
+async def sh_download_gallery_dl(url: str, update_downloader=False) -> str:
     try:
         cmd = ''
         if update_downloader:
@@ -43,10 +43,8 @@ def sh_download_gallery_dl(url: str, update_downloader=False) -> str:
     except Exception as e:
         return e.returncode, f'-**gallery-dl** error {e}\n', e.output
 
-def sh_download_yt_dlp(url: str, update_downloader=False) -> str:
-    
+async def sh_download_yt_dlp(url: str, update_downloader=False) -> str:
     os.makedirs(os.path.join(config.downloads, 'yt-dlp'), exist_ok=True)
-
     try:
         cmd = ''
         if update_downloader:
@@ -58,25 +56,29 @@ def sh_download_yt_dlp(url: str, update_downloader=False) -> str:
     except Exception as e:
         return e.returncode, f'-**yt-dlp** error {e}\n', e.output
 
-def sh_download_megadl(url: str, update_downloader=False) -> str:
-    
+async def sh_download_megadl(url: str, update_downloader=False) -> str:
     os.makedirs(os.path.join(config.downloads, 'megadl'), exist_ok=True)
-
     try:
         cmd = ''
         if update_downloader:
         #     cmd += subprocess.check_output(['downloaders/megadl', '--update-to', 'nightly'], shell=False, text=True, stderr=subprocess.STDOUT)
             cmd += "No update possible for megadl.\n"
-        cmd += subprocess.check_output(['megadl', url], shell=False, text=True, cwd=os.path.join(config.downloads, 'megadl'), stderr=subprocess.STDOUT)
+        cmd += subprocess.check_output(f'megadl {url}', shell=True, text=True, cwd=os.path.join(config.downloads, 'megadl'), stderr=subprocess.STDOUT)
         return 0, f'+**megadl**\n', cmd
     except subprocess.CalledProcessError as e:
         return e.returncode, f'-**megadl** error {e.returncode}\n', e.output
     except Exception as e:
         return e.returncode, f'-**megadl** error {e}\n', e.output
 
+async def e6w_bot_url_extract(update: Update, fallback: str = "") -> str:
+    msg = update.message
+    entities = getattr(msg, "caption_entities") or getattr(msg, "entities") or []
+    
+    return entities[2].url
+
 async def download(urls: str, update, update_downloader=False) -> str:
 
-    ret, mounted, _ = sh_mount()
+    ret, mounted, _ = await sh_mount()
     if ret != 0:
         return mounted
 
@@ -106,7 +108,7 @@ async def download(urls: str, update, update_downloader=False) -> str:
         receipt += f'+hydrus-import.txt\n\n'
 
         if url.lower().startswith(('https://mega.nz/', 'mega.nz', 'www.mega.nz', 'https://www.mega.nz/')):
-            ret, msg, rio = sh_download_megadl(url, update_downloader=update_downloader)
+            ret, msg, rio = await sh_download_megadl(url, update_downloader=update_downloader)
             receipt += msg
             if len(rio) > 0:
                 with io.StringIO(rio) as document:
@@ -118,7 +120,7 @@ async def download(urls: str, update, update_downloader=False) -> str:
 
         any_downloader_success = False
 
-        ret, msg, rio = sh_download_gallery_dl(url, update_downloader=update_downloader)
+        ret, msg, rio = await sh_download_gallery_dl(url, update_downloader=update_downloader)
         if ret == 0: any_downloader_success = True
         receipt += msg
         if len(rio) > 0:
@@ -126,7 +128,7 @@ async def download(urls: str, update, update_downloader=False) -> str:
                 document.name = 'gallery-dl.txt'
                 await update.message.reply_document(document=document, caption='gallery-dl receipt')
 
-        ret, msg, rio = sh_download_yt_dlp(url, update_downloader=update_downloader)
+        ret, msg, rio = await sh_download_yt_dlp(url, update_downloader=update_downloader)
         if ret == 0: any_downloader_success = True
         receipt += msg
         if len(rio) > 0:
@@ -156,7 +158,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         last_downloaders_update = now
 
     urls = update.message.text.strip().split('\n')
-    await update.message.reply_text(f'Downloading {len(urls)} URLs...', parse_mode='Markdown')
+    acknowledge = f'Downloading {len(urls)} URLs...'
+    
+    if update.message.text.startswith('New file matches your tags '):  # e6 watch bot
+        e6url = await e6w_bot_url_extract(update)
+        if e6url:
+            urls = [e6url]
+            acknowledge = f'Downloading URL from E621.net watch bot: {e6url}...'
+
+    await update.message.reply_text(acknowledge, parse_mode='Markdown')
 
     messages = await download(urls, update, update_downloader=update_pending)
     for msg in messages:

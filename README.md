@@ -2,7 +2,7 @@
 # requirements
 
 ## apt
-`apt update && apt install megadl git cifs-utils python-venv -y`
+`apt update && apt install megatools git cifs-utils python-venv -y`
 
 ## /etc/fstab
 ```
