@@ -31,3 +31,10 @@ You need to run this every three months to refresh the token:
 ```bash
 ssh -L 6414:127.0.0.1:6414 host.local 'cd src/hy-dl && ./downloaders/gallery-dl/bin/gallery-dl --config .gallery-dl.conf oauth:deviantart'
 ```
+
+# git --dirty workaround
+```bash
+git update-index --assume-unchanged .downloads
+git update-index --assume-unchanged config.py
+git update-index --assume-unchanged .gallery-dl.conf
+```
