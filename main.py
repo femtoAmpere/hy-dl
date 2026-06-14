@@ -26,7 +26,7 @@ async def sh_mount(fspath=config.downloads):
     cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
     if proc.returncode != 0:
         print(f'*ERROR* Failed to mount target with {proc.returncode}. Output: {stderr}')
-        return proc.returncode, stderr
+        return proc.returncode, stderr, cmd
         
     return 0, cmd, ''
 

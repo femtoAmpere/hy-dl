@@ -40,7 +40,7 @@ password=pas
       "refresh-token": "cache"
     },
     "twitter": {
-      "cookies": "./x.com"
+      "cookies": "config/x.com"
     }
   }
 }
