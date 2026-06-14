@@ -3,7 +3,7 @@ import os
 import subprocess
 import datetime
 
-from config.config import secrets
+from config import secrets
 
 telegram_token = secrets.TELEGRAM_TOKEN
 telegram_users = secrets.TELEGRAM_USERS
