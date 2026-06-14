@@ -8,6 +8,7 @@ from config import secrets
 telegram_token = secrets.TELEGRAM_TOKEN
 telegram_users = secrets.TELEGRAM_USERS
 
+# relative to gitroot
 downloads = os.path.join('.', 'downloads')
 
 version = subprocess.check_output(['git', 'describe', '--tags', '--dirty', '--long']).strip().decode('utf-8')

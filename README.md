@@ -31,6 +31,7 @@ password=pas
 ```
 
 ### .gallery-dl.conf
+All paths are relative to gitroot.
 ```bash
 {
   "extractor": {
