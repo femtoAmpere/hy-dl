@@ -3,8 +3,10 @@ import os
 import subprocess
 import datetime
 
-telegram_token = 'your_botfather_token_here'
-telegram_users = [0, 1, 2]
+from config import secrets
+
+telegram_token = secrets.TELEGRAM_TOKEN
+telegram_users = secrets.TELEGRAM_USERS
 
 downloads = os.path.join('.', 'downloads')
 

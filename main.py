@@ -37,7 +37,7 @@ async def sh_download_gallery_dl(url: str, update_downloader=False) -> str:
         stdout, stderr = await proc.communicate()
         cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
     
-    proc = await asyncio.create_subprocess_shell(f'downloaders/gallery-dl/bin/gallery-dl --config .gallery-dl.conf --dest {config.downloads}/gallery-dl {url}', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+    proc = await asyncio.create_subprocess_shell(f'downloaders/gallery-dl/bin/gallery-dl --config config/.gallery-dl.conf --dest {config.downloads}/gallery-dl {url}', stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
     stdout, stderr = await proc.communicate()
     cmd += (stdout.decode() + '\n' if stdout else '') + (stderr.decode() + ' \n' if stderr else '')
 
