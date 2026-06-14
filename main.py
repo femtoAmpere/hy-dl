@@ -1,5 +1,5 @@
 
-import config
+import config.config as config
 import os
 import io
 import datetime
