@@ -36,7 +36,7 @@ def sh_download_gallery_dl(url: str, update_downloader=False) -> str:
         cmd = ''
         if update_downloader:
             cmd += subprocess.check_output(['downloaders/gallery-dl/bin/python', '-m', 'pip', 'install', '--upgrade', 'pip', 'gallery-dl'], shell=False, text=True, stderr=subprocess.STDOUT)
-        cmd += subprocess.check_output(['downloaders/gallery-dl/bin/gallery-dl', '--config', 'conf/.gallery-dl.conf', '--dest', f'{config.downloads}/gallery-dl', url], shell=False, text=True, stderr=subprocess.STDOUT)
+        cmd += subprocess.check_output(['downloaders/gallery-dl/bin/gallery-dl', '--config', 'config/.gallery-dl.conf', '--dest', f'{config.downloads}/gallery-dl', url], shell=False, text=True, stderr=subprocess.STDOUT)
         return 0, f'+**gallery-dl**\n', cmd
     except subprocess.CalledProcessError as e:
         return e.returncode, f'-**gallery-dl** error {e.returncode}\n', e.output
@@ -79,82 +79,76 @@ def e6w_bot_url_extract(update: Update, fallback: str = "") -> str:
     
     return fallback
 
-def download(urls: list[str], update_downloader=False) -> list[str]:
+def download(url: str, update_downloader=False) -> tuple[str, list[io.StringIO]]:
+    url = url.strip()
 
-    ret, mounted, _ = sh_mount()
-    if ret != 0:
-        return [mounted]
+    receipt = ''
+    docs = []
 
-    msgs = []
+    receipt += f'Download Receipt for `{url}`\n\n'
 
-    for url in urls:
-        url = url.strip()
-
-        receipt = ''
-        docs = []
-
-        receipt += f'Download Receipt for `{url}`\n\n'
-
-        if not url.lower().startswith(('http://', 'https://')):
-            receipt += 'Please send a valid URL starting with http:// or https://\n'
-            msgs.append(receipt)
-            continue
-        
-        if 'furaffinity.net' in url.lower():
-            with open(os.path.join(config.downloads, 'FurAffinity.txt'), 'a+') as f:
-                f.write(url + '\n')
-            receipt += f'+FurAffinity.txt'
-            msgs.append(receipt)
-            continue
-
-        with open(os.path.join(config.downloads, 'hydrus-import.txt'), 'a+') as f:
+    if not url.lower().startswith(('http://', 'https://')):
+        receipt += 'Please send a valid URL starting with http:// or https://\n'
+        return receipt, docs
+    
+    if 'furaffinity.net' in url.lower():
+        with open(os.path.join(config.downloads, 'FurAffinity.txt'), 'a+') as f:
             f.write(url + '\n')
-        receipt += f'+hydrus-import.txt\n\n'
+        receipt += f'+FurAffinity.txt'
+        return receipt, docs
 
-        if url.lower().startswith(('https://mega.nz/', 'mega.nz', 'www.mega.nz', 'https://www.mega.nz/')):
-            ret, msg, rio = sh_download_megadl(url, update_downloader=update_downloader)
-            receipt += msg
-            if rio and len(rio) > 0:
-                doc = io.StringIO(rio)
-                doc.name = 'megadl.txt'
-                docs.append(doc)
-            if ret == 0:
-                msgs.append(receipt)
-                continue
+    with open(os.path.join(config.downloads, 'hydrus-import.txt'), 'a+') as f:
+        f.write(url + '\n')
+    receipt += f'+hydrus-import.txt\n\n'
 
-        any_downloader_success = False
-
-        ret, msg, rio = sh_download_gallery_dl(url, update_downloader=update_downloader)
-        if ret == 0: any_downloader_success = True
+    if url.lower().startswith(('https://mega.nz/', 'mega.nz', 'www.mega.nz', 'https://www.mega.nz/')):
+        ret, msg, rio = sh_download_megadl(url, update_downloader=update_downloader)
         receipt += msg
         if rio and len(rio) > 0:
             doc = io.StringIO(rio)
-            doc.name = 'gallery-dl.txt'
+            doc.name = 'megadl.txt'
             docs.append(doc)
+        if ret == 0:
+            return receipt, docs
 
-        ret, msg, rio = sh_download_yt_dlp(url, update_downloader=update_downloader)
-        if ret == 0: any_downloader_success = True
-        receipt += msg
-        if rio and len(rio) > 0:
-            doc = io.StringIO(rio)
-            doc.name = 'yt-dlp.txt'
-            docs.append(doc)
+    any_downloader_success = False
 
-        if not any_downloader_success:
-            with open(os.path.join(config.downloads, 'failed.txt'), 'a+') as f:
-                f.write(url + '\n')
-            receipt += f'+failed.txt\n\n'
-        
-        msgs.append((receipt, docs))
+    ret, msg, rio = sh_download_gallery_dl(url, update_downloader=update_downloader)
+    if ret == 0: any_downloader_success = True
+    receipt += msg
+    if rio and len(rio) > 0:
+        doc = io.StringIO(rio)
+        doc.name = 'gallery-dl.txt'
+        docs.append(doc)
 
-    return msgs
+    ret, msg, rio = sh_download_yt_dlp(url, update_downloader=update_downloader)
+    if ret == 0: any_downloader_success = True
+    receipt += msg
+    if rio and len(rio) > 0:
+        doc = io.StringIO(rio)
+        doc.name = 'yt-dlp.txt'
+        docs.append(doc)
 
-async def download_worker(urls: list[str], bot, chat_id: int, update_downloader=False):
-    messages = await asyncio.to_thread(download, urls, update_downloader)
-    for msg in messages:
-        await bot.send_message(chat_id=chat_id, text=msg[0], parse_mode='Markdown')
-        for doc in msg[1]:
+    if not any_downloader_success:
+        with open(os.path.join(config.downloads, 'failed.txt'), 'a+') as f:
+            f.write(url + '\n')
+        receipt += f'+failed.txt\n\n'
+    
+    return receipt, docs
+
+async def downloader(urls: list[str], bot, chat_id: int, update_downloader=False):
+    ret, mounted, _ = await asyncio.to_thread(sh_mount)
+    if ret != 0:
+        await bot.send_message(chat_id=chat_id, text=mounted, parse_mode='Markdown')
+        return mounted
+    
+    for url in urls:
+        receipt, docs = await asyncio.to_thread(download, url, update_downloader)
+        await bot.send_message(chat_id=chat_id, text=receipt, parse_mode='Markdown')
+        for doc in docs:
             await bot.send_document(chat_id=chat_id, document=doc, caption=f'{doc.name} receipt')
+
+    return        
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message.from_user.id not in config.telegram_users:
@@ -178,8 +172,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(acknowledge, parse_mode='Markdown')
 
-    context.application.create_task(download_worker(urls, context.bot, update.effective_chat.id, update_downloader=update_pending))
-
+    context.application.create_task(downloader(urls, context.bot, update.effective_chat.id, update_downloader=update_pending))
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Version: {config.version}\nStartup: {config.startup}\nUptime: {datetime.datetime.now() - config.startup}\nLast Downloaders Update: {last_downloaders_update}')
