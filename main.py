@@ -195,11 +195,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     acknowledge = f'Downloading {len(urls)} URLs...'
     
     if update.message.text.startswith('New file matches your tags '):  # e6 watch bot
-        e6url = await e6w_bot_url_extract(update)
+        e6url = e6w_bot_url_extract(update)
         if e6url:
             urls = [e6url]
             acknowledge = f'Downloading URL from E621.net watch bot: {e6url}...'
-    
+
     await update.message.reply_text(acknowledge, parse_mode='Markdown')
 
     downloads_queue.put(DownloadJob(
