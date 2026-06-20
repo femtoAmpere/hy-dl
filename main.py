@@ -5,12 +5,49 @@ import io
 import datetime
 import asyncio
 import subprocess
+import queue
+import threading
+from typing import NamedTuple
 
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 
 last_downloaders_update = datetime.datetime.min
+downloads_queue: queue.Queue["DownloadJob"] = queue.Queue()
+
+
+class DownloadJob(NamedTuple):
+    urls: list[str]
+    chat_id: int
+    update_downloader: bool
+    bot: object
+    loop: asyncio.AbstractEventLoop
+
+
+async def send_download_result(bot, chat_id: int, receipt: str, docs: list[io.StringIO]):
+    await bot.send_message(chat_id=chat_id, text=receipt, parse_mode='Markdown')
+    for doc in docs:
+        await bot.send_document(chat_id=chat_id, document=doc, caption=f'{doc.name} receipt')
+
+def downloader() -> None:
+    while True:
+        job = downloads_queue.get()
+        if job is None:
+            break
+        for index, url in enumerate(job.urls):
+            update_pending, remount = (job.update_downloader, True) if index == 0 else (False, False)
+            receipt, docs = download(url, remount=remount, update_downloader=update_pending)
+            if len(job.urls) > 1: receipt = f'*{index + 1}/{len(job.urls)+downloads_queue.qsize()} downloads queued.*\n{receipt}'
+            future = asyncio.run_coroutine_threadsafe(send_download_result(job.bot, job.chat_id, receipt, docs), job.loop)
+            try:
+                future.result()
+            except Exception as exc:
+                print(f'Error sending download result: {exc}')
+        downloads_queue.task_done()
+
+consumer_thread = threading.Thread(target=downloader, daemon=True)
+consumer_thread.start()
 
 def sh_mount(fspath=config.downloads):
     cmd = ''
@@ -79,11 +116,16 @@ def e6w_bot_url_extract(update: Update, fallback: str = "") -> str:
     
     return fallback
 
-def download(url: str, update_downloader=False) -> tuple[str, list[io.StringIO]]:
+def download(url: str, remount=False, update_downloader=False) -> tuple[str, list[io.StringIO]]:
     url = url.strip()
 
     receipt = ''
     docs = []
+
+    if remount:
+        ret, mounted, _ = sh_mount()
+        if ret != 0:
+            return mounted, docs
 
     receipt += f'Download Receipt for `{url}`\n\n'
 
@@ -136,30 +178,18 @@ def download(url: str, update_downloader=False) -> tuple[str, list[io.StringIO]]
     
     return receipt, docs
 
-async def downloader(urls: list[str], bot, chat_id: int, update_downloader=False):
-    ret, mounted, _ = await asyncio.to_thread(sh_mount)
-    if ret != 0:
-        await bot.send_message(chat_id=chat_id, text=mounted, parse_mode='Markdown')
-        return mounted
-    
-    for url in urls:
-        receipt, docs = await asyncio.to_thread(download, url, update_downloader)
-        await bot.send_message(chat_id=chat_id, text=receipt, parse_mode='Markdown')
-        for doc in docs:
-            await bot.send_document(chat_id=chat_id, document=doc, caption=f'{doc.name} receipt')
-
-    return        
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if update.message.from_user.id not in config.telegram_users:
-        await update.message.reply_text('Unauthorized user.')
-        return
-    
+def update_required() -> bool:
     now, update_pending = datetime.datetime.now(), False
     global last_downloaders_update
     if (now - last_downloaders_update).total_seconds() > 60*60*2:
         update_pending = True
         last_downloaders_update = now
+    return update_pending
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message.from_user.id not in config.telegram_users:
+        await update.message.reply_text('Unauthorized user.')
+        return
 
     urls = update.message.text.strip().split('\n')
     acknowledge = f'Downloading {len(urls)} URLs...'
@@ -172,7 +202,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(acknowledge, parse_mode='Markdown')
 
-    context.application.create_task(downloader(urls, context.bot, update.effective_chat.id, update_downloader=update_pending))
+    downloads_queue.put(DownloadJob(
+        urls=urls,
+        chat_id=update.effective_chat.id,
+        update_downloader=update_required(),
+        bot=context.bot,
+        loop=asyncio.get_running_loop(),
+    ))
 
 async def info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Version: {config.version}\nStartup: {config.startup}\nUptime: {datetime.datetime.now() - config.startup}\nLast Downloaders Update: {last_downloaders_update}')
