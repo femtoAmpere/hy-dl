@@ -199,7 +199,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if e6url:
             urls = [e6url]
             acknowledge = f'Downloading URL from E621.net watch bot: {e6url}...'
-
+    
     await update.message.reply_text(acknowledge, parse_mode='Markdown')
 
     downloads_queue.put(DownloadJob(
