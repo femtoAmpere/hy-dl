@@ -64,7 +64,7 @@ TELEGRAM_USERS = [91140953]
 ## deviantart
 You need to run this every three months to refresh the token:
 ```bash
-ssh -L 6414:127.0.0.1:6414 host.local 'cd src/hy-dl && ./downloaders/gallery-dl/bin/gallery-dl --config .gallery-dl.conf oauth:deviantart'
+ssh -L 6414:127.0.0.1:6414 host.local 'cd src/hy-dl && ./downloaders/gallery-dl/bin/gallery-dl --config ./config/.gallery-dl.conf oauth:deviantart'
 ```
 
 ## twitter / x.com
